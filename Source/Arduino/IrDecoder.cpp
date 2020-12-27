@@ -7,6 +7,11 @@ void IrDecoder::start(int pin)
   attachInterrupt(digitalPinToInterrupt(pin), isr, FALLING);
 }
 
+void IrDecoder::stop(int pin)
+{
+  detachInterrupt(digitalPinToInterrupt(pin));
+}
+
 IrDecoder *IrDecoder::instance;
 void IrDecoder::isr()
 {

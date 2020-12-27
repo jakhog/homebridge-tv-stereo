@@ -13,8 +13,6 @@ bool Communicator::available()
   while (Serial.available() > 0)
   {
     int data = Serial.read();
-    Serial1.print("Read ");
-    Serial1.println(data);
 
     // Wait for STX
     if (this->bufferPosition == 0 && data != 0x02) continue;
@@ -33,7 +31,6 @@ bool Communicator::available()
     // Wait until a full message is received
     if (this->bufferPosition > 4 && this->bufferPosition == this->messageBuffer[3]+5)
     {
-      Serial1.println("Decoding message");
       this->current.type = this->messageBuffer[1];
       this->current.id = this->messageBuffer[2];
       this->current.length = this->messageBuffer[3];
@@ -41,7 +38,6 @@ bool Communicator::available()
       // Discard overflow messages
       if (this->current.length > MAX_DATA)
       {
-        Serial1.println("Discarding too long");
         this->bufferPosition = 0;
         continue;
       }
@@ -57,10 +53,6 @@ bool Communicator::available()
       // Discard corrupt messages
       if (calculatedChecksum != this->messageBuffer[this->current.length+4])
       {
-        Serial1.print("Discarding checksum ");
-        Serial1.print(calculatedChecksum);
-        Serial1.print(" ");
-        Serial1.println(this->messageBuffer[this->current.length+4]);
         this->bufferPosition = 0;
         continue;
       }

@@ -2,18 +2,21 @@
 #include "Denon.h"
 #include "Samsung.h"
 #include "IrDecoder.h"
+#include "IrEncoder.h"
 #include "Messages.h"
 
 Communicator communicator;
 Denon denon;
 Samsung samsung;
 IrDecoder decoder;
+IrEncoder encoder;
 
 void setup() {
   communicator.start(115200);
   denon.start(8,9);
   samsung.start(9600);
   decoder.start(7);
+  encoder.start(6);
 }
 
 void loop() {
@@ -101,7 +104,20 @@ void handleSamsungCommand(Message* req, Message* res)
   {
     byte data[4];
     memcpy(data, req->data, 4);
-    samsung.sendCommand(data);
+    if (data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x00 && data[3] == 0x02)
+    {
+      decoder.stop(7);
+      encoder.sendSamsung(7, 7, 153);
+      delay(50);
+      encoder.sendSamsung(7, 7, 153);
+      delay(50);
+      encoder.sendSamsung(7, 7, 153);
+      decoder.start(7);
+    }
+    else
+    {
+      samsung.sendCommand(data);
+    }
     msgOK(res, req->id);
   }
 }

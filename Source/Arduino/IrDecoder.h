@@ -41,6 +41,7 @@ class IrDecoder {
     
   public:
     void start(int);
+    void stop(int);
     bool available();
     IrPacket read();
 };
