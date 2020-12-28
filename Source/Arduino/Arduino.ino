@@ -87,7 +87,7 @@ void handleDenonCommand(Message* req, Message* res)
 
 void handleDenonStatus(Message* req, Message* res)
 {
-  struct Message result { 0x03, 1 };
+  struct Message result { 0x03, req->id, 1 };
   result.data[0] = denon.isPoweredOn();
   communicator.write(&result);
   msgOK(res, req->id);
@@ -124,7 +124,7 @@ void handleSamsungCommand(Message* req, Message* res)
 
 void handleSamsungStatus(Message* req, Message* res)
 {
-  struct Message result { 0x06, 1 };
+  struct Message result { 0x06, req->id, 1 };
   result.data[0] = samsung.isPoweredOn();
   communicator.write(&result);
   msgOK(res, req->id);
