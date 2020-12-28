@@ -35,26 +35,27 @@ export class HomebridgeParser extends Transform {
 
     private decodeMessage(): void {
         const type = this._buffer[1];
-        const length = this._buffer[2];
-        const data = this._buffer.slice(3, 3+length);
-        const receivedChecksum = this._buffer[3+length];
+        const id = this._buffer[2];
+        const length = this._buffer[3];
+        const data = this._buffer.slice(4, 4+length);
+        const receivedChecksum = this._buffer[4+length];
 
-        let checksum = type ^ length;
+        let checksum = type ^ id ^ length;
         for (const byte of data) {
             checksum ^= byte;
         }
 
         if (checksum === receivedChecksum) {
-            this.push(Buffer.concat([this._buffer.slice(1,2), data]));
+            this.push(Buffer.concat([this._buffer.slice(1,3), data]));
         }
 
-        this._buffer = this._buffer.slice(4+length);
+        this._buffer = this._buffer.slice(5+length);
     }
 
     private get hasFullMessage(): boolean {
-        if (this._buffer.length < 4) return false;
+        if (this._buffer.length < 5) return false;
         if (this._buffer[0] != 0x02) return false;
-        if (this._buffer.length < 4+this._buffer[2]) return false;
+        if (this._buffer.length < 5+this._buffer[3]) return false;
         return true;
     }
 }

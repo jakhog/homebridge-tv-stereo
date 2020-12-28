@@ -20,6 +20,7 @@ export class Communicator extends EventEmitter {
     private readonly _transform: Transform;
     private readonly _arduino: SerialPort;
     private _ready: boolean = false;
+    private _nextRequestId: number = 0;
 
     constructor(path: string, options = {}) {
         super(options);
@@ -28,7 +29,7 @@ export class Communicator extends EventEmitter {
         this._transform.on('data', (chunk) => this.onMessage(chunk));
 
         this._arduino = new SerialPort(path, {
-            baudRate: 9600,
+            baudRate: 115200,
         }, (err) => {
             if (err) {
                 this.emit('error', `Error connecting to serial port: ${err}`);
@@ -38,73 +39,94 @@ export class Communicator extends EventEmitter {
         this._arduino.pipe(this._transform);
 
         this.on('ready', () => this._ready = true);
+        this.sendData(0x00, Buffer.from('READY?', 'ascii'));
     }
 
     private onMessage(chunk: Buffer): void {
+        const id = chunk[1];
         switch (MESSAGE_TYPES[chunk[0]]) {
             case 'text':
-                this.onText(chunk.slice(1).toString('ascii'));
+                this.onText(id, chunk.slice(2).toString('ascii'));
                 break;
             case 'denon_status_response':
-                this.onDenonStatusResponse(chunk[1] === 0x01);
+                this.onDenonStatusResponse(id, chunk[2] === 0x01);
                 break;
             case 'samsung_status_response':
-                this.onSamsungStatusResponse(chunk[1] === 0x01);
+                this.onSamsungStatusResponse(id, chunk[2] === 0x01);
                 break;
             default:
                 this.emit('error', `Unknown message type ${chunk[0]}`);
         }
     }
 
-    private onText(text: string): void {
-        this.emit('text', text);
+    private onText(id: number, text: string): void {
+        this.emit('text', text, id);
 
         if (text === 'READY') this.emit('ready');
         if (text === 'OK') this.emit('ok');
         if (text === 'ERROR') this.emit('error', 'Error handling message');
     }
 
-    private onDenonStatusResponse(isPoweredOn: boolean): void {
-        this.emit('denon-power-status', isPoweredOn);
+    private onDenonStatusResponse(id: number, isPoweredOn: boolean): void {
+        this.emit('denon-power-status', isPoweredOn, id);
     }
 
-    private onSamsungStatusResponse(isPoweredOn: boolean): void {
-        this.emit('samsung-power-status', isPoweredOn);
+    private onSamsungStatusResponse(id: number, isPoweredOn: boolean): void {
+        this.emit('samsung-power-status', isPoweredOn, id);
     }
 
-    private sendData(type: number, data: Buffer): void {
-        const chunk = Buffer.alloc(4+data.length);
+    private sendData(type: number, data: Buffer): number {
+        const id = this._nextRequestId;
+        this._nextRequestId++;
+        if (this._nextRequestId > 255) this._nextRequestId = 1;
+
+        const chunk = Buffer.alloc(5+data.length);
         chunk[0] = 0x02;
         chunk[1] = type;
-        chunk[2] = data.length;
-        data.copy(chunk, 3);
-        let checksum = type ^ data.length;
+        chunk[2] = id;
+        chunk[3] = data.length;
+        data.copy(chunk, 4);
+        
+        let checksum = type ^ id ^ data.length;
         for (const byte of data) {
             checksum ^= byte;
         }
-        chunk[3+data.length] = checksum;
+        chunk[4+data.length] = checksum;
+        
         this._arduino.write(chunk);
+        return id;
     }
 
-    private waitForEventOnce<T>(event: string): Promise<T> {
+    private waitForEvent<T>(id: number, event: string): Promise<T> {
         return new Promise((resolve) => {
-            this.once(event, (data: T) => resolve(data));
+            const listener = (data: T, eid: number) => {
+                if (eid === id) {
+                    this.off(event, listener);
+                    resolve(data);
+                }
+            };
+            this.on(event, listener);
         });
     }
 
-    private async waitForResultOnce(): Promise<void> {
-        const text = await this.waitForEventOnce<string>('text');
+    private async waitForResult(id: number): Promise<void> {
+        const text = await this.waitForEvent<string>(id, 'text');
         if (text !== 'OK') throw text;
     }
 
-    private async waitForResponseOnce<T>(event: string): Promise<T> {
-        let response: T;
-        const listener = (data: T) => response = data;
-        this.once(event, listener);
+    private async waitForResponse<T>(id: number, event: string): Promise<T | undefined> {
+        let response: T | undefined;
+        const listener = (data: T, eid: number) => {
+            if (eid === id) {
+                response = data;
+            }
+            this.off(event, listener);
+        }
+        this.on(event, listener);
 
         try {
-            await this.waitForResultOnce();
-            return response!;
+            await this.waitForResult(id);
+            return response;
         } catch (err) {
             this.off(event, listener);
             throw err;
@@ -113,7 +135,9 @@ export class Communicator extends EventEmitter {
 
     waitForReady(): Promise<void> {
         if (this._ready) return Promise.resolve();
-        return this.waitForEventOnce<void>('ready');
+        return new Promise((resolve) => {
+            this.once('ready', () => resolve());
+        });
     }
 
     get ready(): boolean {
@@ -121,30 +145,30 @@ export class Communicator extends EventEmitter {
     }
 
     sendText(text: string): Promise<void> {
-        this.sendData(0x00, Buffer.from(text, 'ascii'));
-        return this.waitForResultOnce();
+        const id = this.sendData(0x00, Buffer.from(text, 'ascii'));
+        return this.waitForResult(id);
     }
 
     sendDenonCommand(device: number, command: number): Promise<void> {
         const data = Buffer.alloc(2);
         data[0] = device;
         data[1] = command;
-        this.sendData(0x01, data);
-        return this.waitForResultOnce();
+        const id = this.sendData(0x01, data);
+        return this.waitForResult(id);
     }
 
-    getDenonPowerStatus(): Promise<boolean> {
-        this.sendData(0x02, Buffer.alloc(0));
-        return this.waitForResponseOnce<boolean>('denon-power-status');
+    async getDenonPowerStatus(): Promise<boolean> {
+        const id = this.sendData(0x02, Buffer.alloc(0));
+        return await this.waitForResponse<boolean>(id, 'denon-power-status') || false;
     }
 
     sendSamsungCommand(data: Buffer): Promise<void> {
-        this.sendData(0x04, data);
-        return this.waitForResultOnce();
+        const id = this.sendData(0x04, data);
+        return this.waitForResult(id);
     }
 
-    getSamsungPowerStatus(): Promise<boolean> {
-        this.sendData(0x05, Buffer.alloc(0));
-        return this.waitForResponseOnce<boolean>('samsung-power-status');
+    async getSamsungPowerStatus(): Promise<boolean> {
+        const id = this.sendData(0x05, Buffer.alloc(0));
+        return await this.waitForResponse<boolean>(id, 'samsung-power-status') || false;
     }
 }
