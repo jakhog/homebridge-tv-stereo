@@ -1,0 +1,1 @@
+# Adding an IR-in port on the Denon AVR-1705
