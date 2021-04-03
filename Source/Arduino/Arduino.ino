@@ -7,14 +7,14 @@
 
 Communicator communicator;
 Denon denon;
-Samsung samsung;
+// Samsung samsung;
 IrDecoder decoder;
 IrEncoder encoder;
 
 void setup() {
   communicator.start(115200);
   denon.start(8,9);
-  samsung.start(9600);
+  // samsung.start(9600);
   decoder.start(7);
   encoder.start(6);
 }
@@ -45,12 +45,12 @@ void loop() {
       case 0x02:
         handleDenonStatus(req, &res);
         break;
-      case 0x04:
-        handleSamsungCommand(req, &res);
-        break;
-      case 0x05:
-        handleSamsungStatus(req, &res);
-        break;
+//       case 0x04:
+//         handleSamsungCommand(req, &res);
+//         break;
+//       case 0x05:
+//         handleSamsungStatus(req, &res);
+//         break;
       default:
         msgUnknown(&res, req->id);
     }
@@ -93,39 +93,39 @@ void handleDenonStatus(Message* req, Message* res)
   msgOK(res, req->id);
 }
 
-/* --- SAMSUNG --- */
-void handleSamsungCommand(Message* req, Message* res)
-{
-  if (req->length != 4)
-  {
-    msgError(res, req->id);
-  }
-  else
-  {
-    byte data[4];
-    memcpy(data, req->data, 4);
-    if (data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x00 && data[3] == 0x02)
-    {
-      decoder.stop(7);
-      encoder.sendSamsung(7, 7, 153);
-      delay(50);
-      encoder.sendSamsung(7, 7, 153);
-      delay(50);
-      encoder.sendSamsung(7, 7, 153);
-      decoder.start(7);
-    }
-    else
-    {
-      samsung.sendCommand(data);
-    }
-    msgOK(res, req->id);
-  }
-}
-
-void handleSamsungStatus(Message* req, Message* res)
-{
-  struct Message result { 0x06, req->id, 1 };
-  result.data[0] = samsung.isPoweredOn();
-  communicator.write(&result);
-  msgOK(res, req->id);
-}
+// /* --- SAMSUNG --- */
+// void handleSamsungCommand(Message* req, Message* res)
+// {
+//   if (req->length != 4)
+//   {
+//     msgError(res, req->id);
+//   }
+//   else
+//   {
+//     byte data[4];
+//     memcpy(data, req->data, 4);
+//     if (data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x00 && data[3] == 0x02)
+//     {
+//       decoder.stop(7);
+//       encoder.sendSamsung(7, 7, 153);
+//       delay(50);
+//       encoder.sendSamsung(7, 7, 153);
+//       delay(50);
+//       encoder.sendSamsung(7, 7, 153);
+//       decoder.start(7);
+//     }
+//     else
+//     {
+//       samsung.sendCommand(data);
+//     }
+//     msgOK(res, req->id);
+//   }
+// }
+// 
+// void handleSamsungStatus(Message* req, Message* res)
+// {
+//   struct Message result { 0x06, req->id, 1 };
+//   result.data[0] = samsung.isPoweredOn();
+//   communicator.write(&result);
+//   msgOK(res, req->id);
+// }
