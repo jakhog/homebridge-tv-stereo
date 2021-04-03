@@ -1,7 +1,7 @@
 import { API, IndependentPlatformPlugin, Logging, PlatformConfig } from 'homebridge';
 
 import { Communicator } from './serial/communicator';
-import tv from './tv';
+// import tv from './tv';
 import stereo from './stereo'
 
 export class Platform implements IndependentPlatformPlugin {
@@ -10,7 +10,7 @@ export class Platform implements IndependentPlatformPlugin {
         config: PlatformConfig,
         api: API)
     {
-        const TV = tv(api);
+        // const TV = tv(api);
         const Stereo = stereo(api);
 
         const communicator = new Communicator('/dev/ttyACM0');
@@ -23,14 +23,14 @@ export class Platform implements IndependentPlatformPlugin {
 
             try {
                 await communicator.getDenonPowerStatus();
-                await communicator.getSamsungPowerStatus();
+                // await communicator.getSamsungPowerStatus();
             } catch (err) {
                 logger.error(`Power Polling: Failed to get power status: ${err}`);
             }
         }, 1000);
 
         api.publishExternalAccessories('homebridge-plugin-tv-stereo', [
-            new TV(communicator, logger),
+            // new TV(communicator, logger),
             new Stereo(communicator, logger),
         ]);
     }

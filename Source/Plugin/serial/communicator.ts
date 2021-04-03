@@ -4,16 +4,15 @@ import { Buffer } from 'buffer';
 import SerialPort from 'serialport';
 
 import { HomebridgeParser } from './parser';
-import { rejects } from 'assert';
 
 const MESSAGE_TYPES = [
     'text',
     'denon_command',
     'denon_status_request',
     'denon_status_response',
-    'samsung_command',
-    'samsung_status_request',
-    'samsung_status_response'
+    // 'samsung_command',
+    // 'samsung_status_request',
+    // 'samsung_status_response'
 ];
 
 export class Communicator extends EventEmitter {
@@ -51,9 +50,9 @@ export class Communicator extends EventEmitter {
             case 'denon_status_response':
                 this.onDenonStatusResponse(id, chunk[2] === 0x01);
                 break;
-            case 'samsung_status_response':
-                this.onSamsungStatusResponse(id, chunk[2] === 0x01);
-                break;
+            // case 'samsung_status_response':
+            //     this.onSamsungStatusResponse(id, chunk[2] === 0x01);
+            //     break;
             default:
                 this.emit('error', `Unknown message type ${chunk[0]}`);
         }
@@ -71,9 +70,9 @@ export class Communicator extends EventEmitter {
         this.emit('denon-power-status', isPoweredOn, id);
     }
 
-    private onSamsungStatusResponse(id: number, isPoweredOn: boolean): void {
-        this.emit('samsung-power-status', isPoweredOn, id);
-    }
+    // private onSamsungStatusResponse(id: number, isPoweredOn: boolean): void {
+    //     this.emit('samsung-power-status', isPoweredOn, id);
+    // }
 
     private sendData(type: number, data: Buffer): number {
         const id = this._nextRequestId;
@@ -162,13 +161,13 @@ export class Communicator extends EventEmitter {
         return await this.waitForResponse<boolean>(id, 'denon-power-status') || false;
     }
 
-    sendSamsungCommand(data: Buffer): Promise<void> {
-        const id = this.sendData(0x04, data);
-        return this.waitForResult(id);
-    }
+    // sendSamsungCommand(data: Buffer): Promise<void> {
+    //     const id = this.sendData(0x04, data);
+    //     return this.waitForResult(id);
+    // }
 
-    async getSamsungPowerStatus(): Promise<boolean> {
-        const id = this.sendData(0x05, Buffer.alloc(0));
-        return await this.waitForResponse<boolean>(id, 'samsung-power-status') || false;
-    }
+    // async getSamsungPowerStatus(): Promise<boolean> {
+    //     const id = this.sendData(0x05, Buffer.alloc(0));
+    //     return await this.waitForResponse<boolean>(id, 'samsung-power-status') || false;
+    // }
 }
